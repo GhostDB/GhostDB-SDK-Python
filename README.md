@@ -20,6 +20,9 @@ def getStockData(ticker_smbl):
         # a variable called stock_data
     
         # Store result in cache
+        # If it is essential that the data be cached
+        # we can check the value returned by the below call.
+        # The value will let us know if the data was cached successfully.
         cache.put(ticker_smbl, stock_data)
     return stock_data
 
