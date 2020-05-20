@@ -2,6 +2,31 @@
 
 The GhostDB SDK for Python allows Python developers to write software that makes use of the [GhostDB](https://www.github.com/ghostdb/ghostdb-cache-node) distributed caching system.
 
+## Example Usage
+
+```python
+from GhostDB.cache import Cache
+
+cache = Cache("my_ghostdb.conf")
+
+def getStockData(ticker_smbl):
+    # Fetch data from cache
+    stock_data = cache.get(ticker_smbl)
+
+    if stock_data["Value"] == "CACHE_MISS":
+        # Fetch from MySQL.
+        # After any processing, we can 
+        # assume our computed value is stored in
+        # a variable called stock_data
+    
+        # Store result in cache
+        cache.put(ticker_smbl, stock_data)
+    return stock_data
+
+return getStockData("AMZN")
+
+```
+
 ## Installation
 
 The GhostDB SDK for Python can be installed using pip at the command line:
