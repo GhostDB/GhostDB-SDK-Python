@@ -1,0 +1,3 @@
+include README.rst
+include python/GhostDB/tests/ghostdb_test.conf
+include python/GhostDB/tests/ghostdb_sim.conf
