@@ -14,7 +14,7 @@ def getStockData(ticker_smbl):
     stock_data = cache.get(ticker_smbl)
 
     if stock_data["Value"] == "CACHE_MISS":
-        # Fetch from MySQL.
+        # Fetch from your database (MongoDB, MySQL etc.)
         # After any processing, we can 
         # assume our computed value is stored in
         # a variable called stock_data
