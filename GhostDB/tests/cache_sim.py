@@ -15,10 +15,10 @@ KEYSPACE TRANSFER SIMULATION:
     - SET THE VALUE AGAIN - THE KEY SHOULD BE SET ON THE NEW LIVE SERVER
 """
 
-from GhostDB import cache
+from GhostDB.cache import Cache
 import time
 
-cache = cache.Cache("ghostdb_sim.conf")
+cache = Cache("ghostdb_sim.conf")
 
 
 def cache_data(key, value):
@@ -57,6 +57,24 @@ def flush_cache():
         print(e)
         return None
 
+def flush_node(node):
+    try:
+        print("FLUSHING NODE")
+        resp = cache.flush_node(node)
+        return resp
+    except cache.GhostNoMoreServersError as e:
+        print(e)
+        return None
+
+def node_size(node):
+    try:
+        print("NODE SIZE")
+        resp = cache.node_size(node)
+        return resp
+    except cache.GhostUnknownNodeError as e:
+        print(e)
+        return None
+
 def get_stats():
     try:
         print("GETTING SNITCH METRICS")
@@ -69,7 +87,7 @@ def get_stats():
 def main():  
     i = 0
     while i < 2:
-        res = cache_data("Dublin", "Ireland")
+        res = cache.node_size("127.0.0.1")
         print(res)
         time.sleep(45)
 

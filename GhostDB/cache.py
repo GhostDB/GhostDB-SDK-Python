@@ -34,6 +34,7 @@ class Cache():
         "add": "/add",
         "delete": "/delete",
         "flush": "/flush",
+        "nodeSize": "/nodeSize",
         "getSnitchMetrics": "/getSnitchMetrics",
         "getWatchdogMetrics": "/getWatchdogMetrics"
     }
@@ -60,6 +61,17 @@ class Cache():
             Exception.__init__(
                 self,
                 "[ERROR]: Key must be of type string"
+            )
+    
+    class GhostUnknownNodeError(Exception):
+        """
+        The error thrown when a node is not a known GhostDB node
+        """
+
+        def __init__(self):
+            Exception.__init__(
+                self,
+                "[ERROR]: Node is not a known GhostDB Node"
             )
 
     def __init__(self, nodes_file, http=True, port=7991):
@@ -227,6 +239,47 @@ class Cache():
                 Cache._DEAD_SERVERS.append(node.node)
                 self.ring.delete(node.node)
                 return self.flush()
+
+    def flush_node(self, node):
+        """
+        The `flushNode()` method will delete all key/value
+        pairs from a specified node.
+        """
+
+        nodes = self.ring.get_points()
+
+        for n in nodes:
+            if node == n.node:
+                try:
+                    address = self.protocol + n.node + ":" + self.port + Cache._API_ENDPOINT_MAP["flush"]
+                    response  = requests.get(address)
+                    return json.loads(response.text)
+                except:
+                    Cache._DEAD_SERVERS.append(n.node)
+                    self.ring.delete(n.node)
+                    return {"Message": "ERR_FLUSH"}
+        raise Cache.GhostUnknownNodeError()
+
+    def node_size(self, node):
+        """
+        The `nodeSize()` method will return the number
+        of key-value pairs in the node. This is a
+        non-blocking operation.
+        """
+
+        nodes = self.ring.get_points()
+
+        for n in nodes:
+            if node == n.node:
+                try:
+                    address = self.protocol + n.node + ":" + self.port + Cache._API_ENDPOINT_MAP["nodeSize"]
+                    response = requests.get(address)
+                    return json.loads(response.text)
+                except:
+                    Cache._DEAD_SERVERS.append(n.node)
+                    self.ring.delete(n.node)
+                    raise Cache.GhostUnknownNodeError()
+        raise Cache.GhostUnknownNodeError()
 
     def getSnitchMetrics(self, metrics=None, visitedNodes=None):
         """
