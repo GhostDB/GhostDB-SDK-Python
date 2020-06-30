@@ -66,11 +66,57 @@ def get_stats():
         print(e)
         return None
 
+def get_watchdog():
+    try:
+        print("GETTING WATCHDOG METRICS")
+        resp = cache.getWatchdogMetrics()
+        return resp
+    except cache.GhostNoMoreServersError as e:
+        print(e)
+        return None
+
+def get_data(key):
+    try:
+        print("GETTING DATA")
+        resp = cache.get(key)
+        return resp
+    except cache.GhostNoMoreServersError as e:
+        print(e)
+        return None
+
+def get_size(node):
+    try:
+        print("GETTING SIZE")
+        resp = cache.nodeSize(node)
+        return resp
+    except cache.GhostNoMoreServersError as e:
+        print(e)
+        return None
+
+
 def main():  
     i = 0
     while i < 2:
         res = cache_data("Dublin", "Ireland")
-        print(res)
+        print("PUT", res)
+        res = get_data("Dublin")
+        print("GET", res)
+        res = add_data("Dublin", "Irealnd")
+        print("ADD", res)
+        # res = delete_data("Dublin")
+        # print(res)
+        res = cache_data("Italy", "Rome")
+        print("PUT", res)
+        # res = get_data("Italy")
+        # print("GET", res)
+        # res = flush_cache()
+        # print("FLUSH", res)
+        # res = get_data("Italy")
+        # print("GET", res)
+        # res = get_stats()
+        # print("STATS", res)
+        res = get_size("127.0.0.1")
+        print("SIZE", res)
         time.sleep(45)
 
 if __name__ == "__main__":

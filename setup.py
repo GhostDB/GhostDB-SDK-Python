@@ -6,7 +6,7 @@ def readme():
 
 setup(
     name="ghostdb",
-    version="0.9",
+    version="1.0.0",
     description="Python SDK for GhostDB Cache",
     long_description=readme(),
     long_description_content_type="text/markdown",

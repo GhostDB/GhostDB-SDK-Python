@@ -3,8 +3,11 @@ import requests
 import json
 import time
 import threading
+import jsonpickle
 from decimal import Decimal
 from GhostDB.ring import Ring 
+from GhostDB.cache_request import CacheRequest, CacheRequestJsonEncoder
+from GhostDB.cache_response import CacheResponse, cache_response_json_decoder
 
 logging.basicConfig(filename="ghostdb.log")
 
@@ -34,6 +37,7 @@ class Cache():
         "add": "/add",
         "delete": "/delete",
         "flush": "/flush",
+        "nodeSize": "/nodeSize",
         "getSnitchMetrics": "/getSnitchMetrics",
         "getWatchdogMetrics": "/getWatchdogMetrics"
     }
@@ -80,9 +84,7 @@ class Cache():
         if not isinstance(key, str):
             raise Cache.GhostKeyError()
         else:
-            request_object = {
-                "Key": key
-            }
+            request_object = CacheRequest(key)
 
             node = self.ring.get_point_for(key)
             
@@ -91,8 +93,11 @@ class Cache():
                 
             try:
                 address = self.protocol + node.node + ":" + self.port + Cache._API_ENDPOINT_MAP["get"]
-                response = requests.post(address, json=request_object)
-                return json.loads(response.text)
+                json_obj = Cache.to_dict(request_object)
+                headers = {'Content-type': 'application/json'}
+                response = requests.post(address, headers=headers, data=json.dumps(json_obj))
+                cache_response_obj = Cache.get_object_from_response_stream(response.text)
+                return cache_response_obj
             except:
                 Cache._DEAD_SERVERS.append(node.node)
                 self.ring.delete(node.node)
@@ -118,12 +123,7 @@ class Cache():
         if not isinstance(key, str):
             raise Cache.GhostKeyError()
         else:
-            request_object = {
-                "Key": key,
-                "Value": json.dumps(value, default=self._default),
-                "TTL": ttl
-            }
-
+            request_object = CacheRequest(key, value, ttl)
             node = self.ring.get_point_for(key)
 
             if node == None:
@@ -131,9 +131,13 @@ class Cache():
 
             try:
                 address = self.protocol + node.node + ":" + self.port + Cache._API_ENDPOINT_MAP["put"]
-                response = requests.post(address, json=request_object)
-                return json.loads(response.text)
-            except:
+                json_obj = Cache.to_dict(request_object)
+                headers = {'Content-type': 'application/json'}
+                response = requests.post(address, headers=headers, data=json.dumps(json_obj))
+                cache_response_obj = Cache.get_object_from_response_stream(response.text)
+                return cache_response_obj
+            except Exception as e:
+                print(str(e))
                 Cache._DEAD_SERVERS.append(node.node)
                 self.ring.delete(node.node)
                 return self.put(key, value)
@@ -156,11 +160,7 @@ class Cache():
         if not isinstance(key, str):
             raise Cache.GhostKeyError()
         else:
-            request_object = {
-                "Key": key,
-                "Value": json.dumps(value, default=self._default),
-                "TTL": ttl
-            }
+            request_object = CacheRequest(key, value, ttl)
 
             node = self.ring.get_point_for(key)
 
@@ -169,8 +169,11 @@ class Cache():
 
             try:
                 address = self.protocol + node.node + ":" + self.port + Cache._API_ENDPOINT_MAP["add"]
-                response = requests.post(address, json=request_object)
-                return json.loads(response.text)
+                json_obj = Cache.to_dict(request_object)
+                headers = {'Content-type': 'application/json'}
+                response = requests.post(address, headers=headers, data=json.dumps(json_obj))
+                cache_response_obj = Cache.get_object_from_response_stream(response.text)
+                return cache_response_obj
             except:
                 Cache._DEAD_SERVERS.append(node.node)
                 self.ring.delete(node.node)
@@ -191,9 +194,7 @@ class Cache():
         if not isinstance(key, str):
             raise Cache.GhostKeyError()
         else:
-            request_object = {
-                "Key": key
-            }
+            request_object = CacheRequest(key)
 
             node = self.ring.get_point_for(key)
 
@@ -202,27 +203,66 @@ class Cache():
 
             try:
                 address = self.protocol + node.node + ":" + self.port + Cache._API_ENDPOINT_MAP["delete"]
-                response = requests.post(address, json=request_object)
-                return json.loads(response.text)
+                json_obj = Cache.to_dict(request_object)
+                headers = {'Content-type': 'application/json'}
+                response = requests.post(address, headers=headers, data=json.dumps(json_obj))
+                cache_response_obj = Cache.get_object_from_response_stream(response.text)
+                return cache_response_obj
             except:
                 Cache._DEAD_SERVERS.append(node.node)
                 self.ring.delete(node.node)
                 return self.delete(node.node)
 
-    def flush(self):
+    def nodeSize(self, node):
+        """
+        The `nodeSize()` method will return the number
+        of key/value pairs in a given node.
+        """
+        request_object = CacheRequest()
+        nodes = self.ring.get_points()
+        for n in nodes:
+            print("NODE", node)
+            print("N", n.node)
+            if node == n.node:
+                try:
+                    address = self.protocol + n.node + ":" + self.port + Cache._API_ENDPOINT_MAP["nodeSize"]
+                    json_obj = Cache.to_dict(request_object)
+                    headers = {'Content-type': 'application/json'}
+                    response = requests.post(address, headers=headers, data=json.dumps(json_obj))
+                    cache_response_obj = Cache.get_object_from_response_stream(response.text)
+                    return cache_response_obj
+                except Exception as e:
+                    Cache._DEAD_SERVERS.append(n.node)
+                    self.ring.delete(n.node)
+                    return None
+        return None
+
+    def flush(self, result=None, visitedNodes=None):
         """
         The `flush()` method will delete all key/value
         pairs from all nodes specified in the `node_file`
         at the time of flushing.
         """
+        request_object = CacheRequest()
+
+        if result is None:
+            result = []
+
+        if visitedNodes is None:
+            visitedNodes = []
 
         nodes = self.ring.get_points()
         
         for node in nodes:
             try:
-                address = self.protocol + node.node + ":" + self.port + Cache._API_ENDPOINT_MAP["flush"]
-                response = requests.get(address)
-                return json.loads(response.text)
+                if node.node not in visitedNodes:
+                    address = self.protocol + node.node + ":" + self.port + Cache._API_ENDPOINT_MAP["flush"]
+                    json_obj = Cache.to_dict(request_object)
+                    headers = {'Content-type': 'application/json'}
+                    response = requests.post(address, headers=headers, data=json.dumps(json_obj))
+                    cache_response_obj = Cache.get_object_from_response_stream(response.text)
+                    result.append({"node": node.node, "response": cache_response_obj})
+                    visitedNodes.append(node.node)
             except:
                 Cache._DEAD_SERVERS.append(node.node)
                 self.ring.delete(node.node)
@@ -242,15 +282,19 @@ class Cache():
 
         nodes = self.ring.get_points()
         
+        request_object = CacheRequest()
+
         for node in nodes:
             try:
                 if node.node not in visitedNodes:
                     address = self.protocol + node.node + ":" + self.port + Cache._API_ENDPOINT_MAP["getSnitchMetrics"]
-                    response = requests.get(address)
-                    nodeMetrics = json.loads(response.text)
-                    metrics.append({"node": node.node, "metrics": nodeMetrics})
+                    json_obj = Cache.to_dict(request_object)
+                    headers = {'Content-type': 'application/json'}
+                    response = requests.post(address, headers=headers, data=json.dumps(json_obj))
+                    cache_response_obj = Cache.get_object_from_response_stream(response.text)
+                    metrics.append({"node": node.node, "metrics": cache_response_obj})
                     visitedNodes.append(node.node)
-            except:
+            except Exception as e:
                 Cache._DEAD_SERVERS.append(node.node)
                 self.ring.delete(node.node)
                 return self.getSnitchMetrics(metrics, visitedNodes)
@@ -269,14 +313,18 @@ class Cache():
             visitedNodes = []
 
         nodes = self.ring.get_points()
+
+        request_object = CacheRequest()
         
         for node in nodes:
             try:
                 if node.node not in visitedNodes:
                     address = self.protocol + node.node + ":" + self.port + Cache._API_ENDPOINT_MAP["getWatchdogMetrics"]
-                    response = requests.get(address)
-                    nodeMetrics = json.loads(response.text)
-                    metrics.append({"node": node.node, "metrics": nodeMetrics})
+                    json_obj = Cache.to_dict(request_object)
+                    headers = {'Content-type': 'application/json'}
+                    response = requests.post(address, headers=headers, data=json.dumps(json_obj))
+                    cache_response_obj = Cache.get_object_from_response_stream(response.text)
+                    metrics.append({"node": node.node, "metrics": cache_response_obj})
                     visitedNodes.append(node.node)
             except:
                 Cache._DEAD_SERVERS.append(node.node)
@@ -292,12 +340,16 @@ class Cache():
         if visitedNodes == None:
             visitedNodes = []
 
+        request_object = CacheRequest()
+
         nodes = self.ring.get_points()
         for node in nodes:
             try:
                 if node.node not in visitedNodes:
                     address = self.protocol + node.node + ":" + self.port + Cache._API_ENDPOINT_MAP["ping"]
-                    response = requests.get(address)
+                    json_obj = Cache.to_dict(request_object)
+                    headers = {'Content-type': 'application/json'}
+                    response = requests.post(address, headers=headers, data=json.dumps(json_obj))
                     if response.status_code == 200:
                         liveNodes.append(node.node)
                     visitedNodes.append(node.node)
@@ -323,3 +375,11 @@ class Cache():
         if isinstance(obj, Decimal):
             return str(obj)
         raise TypeError("Object of type '%s' is not JSON serializable" % type(obj).__name__)
+
+    @staticmethod
+    def get_object_from_response_stream(stream):
+        return cache_response_json_decoder(stream)
+
+    @staticmethod
+    def to_dict(obj):
+        return json.loads(json.dumps(obj, default=lambda o: o.__dict__))
