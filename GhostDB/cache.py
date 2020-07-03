@@ -38,8 +38,8 @@ class Cache():
         "delete": "/delete",
         "flush": "/flush",
         "nodeSize": "/nodeSize",
-        "getSnitchMetrics": "/getSnitchMetrics",
-        "getWatchdogMetrics": "/getWatchdogMetrics"
+        "getSysMetrics": "/getSysMetrics",
+        "getAppMetrics": "/getAppMetrics"
     }
 
     class GhostNoMoreServersError(Exception):
@@ -268,10 +268,10 @@ class Cache():
                 self.ring.delete(node.node)
                 return self.flush()
 
-    def getSnitchMetrics(self, metrics=None, visitedNodes=None):
+    def getSysMetrics(self, metrics=None, visitedNodes=None):
         """
-        The `getSnitchMetrics()` method will fetch all
-        snitch metricsfrom all nodes specified in the
+        The `getSysMetrics()` method will fetch all
+        system metrics from all nodes specified in the
         `node_file` at the time of calling.
         """
         if metrics is None:
@@ -287,7 +287,7 @@ class Cache():
         for node in nodes:
             try:
                 if node.node not in visitedNodes:
-                    address = self.protocol + node.node + ":" + self.port + Cache._API_ENDPOINT_MAP["getSnitchMetrics"]
+                    address = self.protocol + node.node + ":" + self.port + Cache._API_ENDPOINT_MAP["getSysMetrics"]
                     json_obj = Cache.to_dict(request_object)
                     headers = {'Content-type': 'application/json'}
                     response = requests.post(address, headers=headers, data=json.dumps(json_obj))
@@ -297,12 +297,12 @@ class Cache():
             except Exception as e:
                 Cache._DEAD_SERVERS.append(node.node)
                 self.ring.delete(node.node)
-                return self.getSnitchMetrics(metrics, visitedNodes)
+                return self.getSysMetrics(metrics, visitedNodes)
         return metrics
     
-    def getWatchdogMetrics(self, metrics=None, visitedNodes=None):
+    def getAppMetrics(self, metrics=None, visitedNodes=None):
         """
-        The `getWatchdogMetrics()` method will fetch all
+        The `getAppMetrics()` method will fetch all
         application metrics from all nodes specified in the
         `node_file` at the time of calling.
         """
@@ -319,7 +319,7 @@ class Cache():
         for node in nodes:
             try:
                 if node.node not in visitedNodes:
-                    address = self.protocol + node.node + ":" + self.port + Cache._API_ENDPOINT_MAP["getWatchdogMetrics"]
+                    address = self.protocol + node.node + ":" + self.port + Cache._API_ENDPOINT_MAP["getAppMetrics"]
                     json_obj = Cache.to_dict(request_object)
                     headers = {'Content-type': 'application/json'}
                     response = requests.post(address, headers=headers, data=json.dumps(json_obj))
@@ -329,7 +329,7 @@ class Cache():
             except:
                 Cache._DEAD_SERVERS.append(node.node)
                 self.ring.delete(node.node)
-                return self.getWatchdogMetrics(metrics, visitedNodes)
+                return self.getAppMetrics(metrics, visitedNodes)
         return metrics
 
     def ping(self, liveNodes=None, visitedNodes=None):
